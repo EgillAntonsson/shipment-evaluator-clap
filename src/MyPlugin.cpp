@@ -103,9 +103,10 @@ void MyPlugin::process_audio(const clap_process_t *process) {
     uint32_t nframes = process->frames_count;
     
     if (nframes > 0 && process->audio_outputs_count > 0 && 
-        process->audio_outputs[0].data32) {
+        process->audio_outputs[0].data32 &&
+        process->audio_outputs[0].data32[0]) {
         
-        float* output_buffer = process->audio_outputs[0].data32;
+        float* output_buffer = process->audio_outputs[0].data32[0];
         float gain = data_.parameters[0]; // First parameter for gain
         
         for (uint32_t frame = 0; frame < nframes; ++frame) {
