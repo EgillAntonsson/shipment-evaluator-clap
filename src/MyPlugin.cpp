@@ -16,6 +16,10 @@ static const clap_plugin_descriptor_t plugin_descriptor = {
     .features = NULL
 };
 
+const clap_plugin_descriptor_t *my_plugin_descriptor() {
+    return &plugin_descriptor;
+}
+
 MyPlugin::MyPlugin(const clap_host_t *host) : host_(host) {
     // Initialize plugin data
     data_.sample_rate = 44100.0;
