@@ -100,7 +100,7 @@ const clap_plugin_t* MyPlugin::get_clap_interface() const {
 
 void MyPlugin::process_audio(const clap_process_t *process) {
     // Simple audio processing example - just pass through with gain
-    uint32_t nframes = process->out_frames;
+    uint32_t nframes = process->frames_count;
     
     if (nframes > 0 && process->audio_outputs_count > 0 && 
         process->audio_outputs[0].data32) {
