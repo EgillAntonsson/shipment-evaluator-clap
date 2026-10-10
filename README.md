@@ -14,9 +14,9 @@ unchanged so the plugin can sit in a DAW track's FX chain.
 
 ## The behavior
 
-While the DAW is playing, the Evaluation Meter advances toward 11. At 11, the
-plugin displays the `♬ ♫ ♪ ♩ →  SHIP IT  ← ♩ ♪ ♫ ♬` result. Stopping playback
-resets the meter.
+Add the plugin to a track and press play: the Evaluation Meter advances toward
+11, then displays the `♬ ♫ ♪ ♩ →  SHIP IT  ← ♩ ♪ ♫ ♬` result. Stopping playback
+resets the meter. Enjoy the urge to ship it!
 
 ## Build
 
@@ -91,6 +91,3 @@ processing callback reported playback and the meter value advanced. The plugin
 now requests periodic CLAP main-thread callbacks while playing and invalidates
 the view there. REAPER testing confirmed the needle advances to 11 and resets
 when playback stops.
-
-Add the plugin to a track, press play, and get the urge to
-`♬ ♫ ♪ ♩ →  SHIP IT  ← ♩ ♪ ♫ ♬`.
