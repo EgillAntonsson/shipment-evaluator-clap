@@ -21,6 +21,9 @@ private:
     std::atomic<bool> process_diagnostic_logged_{false};
     std::atomic<uint32_t> last_transport_flags_{UINT32_MAX};
     std::atomic<uint64_t> playing_diagnostic_frames_{0};
+    std::atomic<uint32_t> gui_callback_count_{0};
+    uint32_t gui_callback_frame_threshold_ = 1600;
+    uint64_t gui_callback_frame_accumulator_ = 0;
     clap_plugin_t plugin_interface_{};
     ShipmentEvaluatorGui gui_;
 

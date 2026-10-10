@@ -15,6 +15,7 @@ public:
     bool set_parent(void *parent_view);
     bool set_transient(void *parent_view);
     void suggest_title(const char *title);
+    void refresh();
     bool show();
     bool hide();
 

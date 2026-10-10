@@ -79,11 +79,18 @@ fresh instance, and open its window:
 The FX replacement is recorded as one undoable project change. The helper only
 changes the Master track; it does not remove instances from other tracks.
 
-## Known issues
+## REAPER compatibility notes
 
-The initial DAW / REAPER compatibility issue was caused by a missing required
-`on_main_thread` callback. The plugin now supplies that callback and is built as
-a signed macOS `.clap` bundle.
+An earlier REAPER compatibility issue made the plugin appear unavailable: the
+CLAP plugin interface was missing its required `on_main_thread` callback. The
+plugin now supplies that callback and is built as a signed macOS `.clap` bundle.
+
+The embedded meter previously relied on a Cocoa run-loop timer to redraw. That
+timer did not reliably fire in REAPER's embedded UI, even though the audio
+processing callback reported playback and the meter value advanced. The plugin
+now requests periodic CLAP main-thread callbacks while playing and invalidates
+the view there. REAPER testing confirmed the needle advances to 11 and resets
+when playback stops.
 
 Add the plugin to a track, press play, and get the urge to
 `♬ ♫ ♪ ♩ →  SHIP IT  ← ♩ ♪ ♫ ♬`.

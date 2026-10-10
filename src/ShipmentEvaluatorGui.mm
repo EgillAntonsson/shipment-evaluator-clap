@@ -2,17 +2,11 @@
 #include "ShipmentEvaluatorGui.h"
 #include <algorithm>
 #include <cmath>
-#import <os/log.h>
 
 namespace {
 constexpr CGFloat kWindowWidth = 640.0;
 constexpr CGFloat kWindowHeight = 500.0;
 constexpr CGFloat kPi = 3.14159265358979323846;
-
-os_log_t gui_log() {
-    static os_log_t logger = os_log_create("rocks.egill.shipment-evaluator", "gui");
-    return logger;
-}
 
 void draw_text(NSString *text,
                NSRect rect,
@@ -32,11 +26,8 @@ void draw_text(NSString *text,
 @interface ShipmentMeterView : NSView {
 @private
     const std::atomic<double> *meter_;
-    NSTimer *refresh_timer_;
 }
 - (instancetype)initWithMeter:(const std::atomic<double> *)meter;
-- (void)refreshMeter:(NSTimer *)timer;
-- (void)updateRefreshTimer;
 @end
 
 @implementation ShipmentMeterView
@@ -56,41 +47,6 @@ void draw_text(NSString *text,
 
 - (BOOL)isOpaque {
     return YES;
-}
-
-- (void)viewDidMoveToWindow {
-    [super viewDidMoveToWindow];
-    [self updateRefreshTimer];
-}
-
-- (void)setHidden:(BOOL)hidden {
-    [super setHidden:hidden];
-    [self updateRefreshTimer];
-}
-
-- (void)updateRefreshTimer {
-    if (self.window && !self.hidden && !refresh_timer_) {
-        refresh_timer_ = [NSTimer scheduledTimerWithTimeInterval:1.0 / 30.0
-                                                         target:self
-                                                       selector:@selector(refreshMeter:)
-                                                       userInfo:nil
-                                                        repeats:YES];
-        os_log_info(gui_log(), "GUI refresh timer started");
-    } else if (refresh_timer_) {
-        [refresh_timer_ invalidate];
-        refresh_timer_ = nil;
-    }
-}
-
-- (void)refreshMeter:(NSTimer *)timer {
-    (void)timer;
-    [self setNeedsDisplay:YES];
-    static NSUInteger refresh_count = 0;
-    if (++refresh_count % 30 == 0) {
-        os_log_info(gui_log(),
-                    "GUI refresh timer active: meter=%.3f",
-                    meter_->load(std::memory_order_relaxed));
-    }
 }
 
 - (void)drawRect:(NSRect)dirtyRect {
@@ -326,6 +282,13 @@ void ShipmentEvaluatorGui::suggest_title(const char *title) {
     NSString *window_title = [NSString stringWithUTF8String:title];
     if (window_title)
         [(__bridge NSWindow *)window_ setTitle:window_title];
+}
+
+void ShipmentEvaluatorGui::refresh() {
+    if (!view_)
+        return;
+
+    [(__bridge ShipmentMeterView *)view_ setNeedsDisplay:YES];
 }
 
 bool ShipmentEvaluatorGui::show() {
