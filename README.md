@@ -1,88 +1,46 @@
-# My CLAP Plugin
+# The Shipment Evaluator CLAP Plugin
 
-A simple CLAP plugin implementation using C++ with functional programming principles.
+A CLAP utility plugin inspired by the [ReaScript Shipment Evaluator](https://www.egill.rocks/blog/rea-scripts/shipment-evaluator).
+It does not have audio inputs or outputs and does not process audio.
 
-## Project Structure
+When the host transport is playing, the Evaluation Meter advances by 0.025 per
+processing block until it reaches 11. Stopping playback resets the meter. At 11,
+the GUI displays:
 
-```
-.
-├── CMakeLists.txt          # Main CMake build file
-├── README.md               # This file
-├── include/                # Header files
-│   ├── MyPlugin.h          # Main plugin class definition
-│   ├── MyPluginData.h      # Plugin data structure
-│   └── DSPProcessor.h      # DSP processing functions
-├── src/                    # Source files
-│   ├── plugin.cpp          # C entry point and wrapper
-│   ├── MyPlugin.cpp        # Main plugin implementation  
-│   └── DSPProcessor.cpp    # DSP processor implementation
-├── test/                   # Unit tests
-│   ├── CMakeLists.txt      # Test build configuration
-│   ├── test_main.cpp       # Test harness
-│   └── test_DSPProcessor.cpp # DSP processor tests
-└── build/                  # Build output directory (created by cmake)
-```
+> ♬ ♫ ♪ ♩  →  SHIP IT !  ←  ♩ ♪ ♫ ♬
 
-## Implementation Approach
+The plugin provides an embedded Cocoa GUI on macOS. The needle follows the
+transport-driven meter; it is a display, not an audio control.
 
-This plugin uses a hybrid approach that combines:
-1. **C ABI compatibility** for the main plugin interface 
-2. **C++ features** for internal implementation (RAII, functional patterns)
-3. **Functional programming principles** in DSP processing
-4. **TDD testing** via unit tests
+## Build
 
-### Key Features
+Requirements:
 
-- **C ABI Wrapper Layer**: All plugin callbacks are implemented as C functions that delegate to C++ methods
-- **Functional DSP Processing**: Pure functions for gain processing and filtering  
-- **Testability**: DSP functions can be easily unit tested
-- **RAII Resource Management**: Automatic memory management for internal state
-- **Extensible Design**: Functional composition patterns support future enhancements
+- macOS with Xcode Command Line Tools
+- CMake 3.16 or later
+- A C++17/Objective-C++17 compiler
+- The [CLAP headers](https://github.com/free-audio/clap)
 
-## Building
+Set `CLAP_PATH` to the CLAP checkout if it is not already in a standard include
+directory, then configure and build:
 
-### Prerequisites
-- CMake 3.16 or higher
-- A C++17 compatible compiler (GCC 7+, Clang 5+, MSVC 2017+)
-- CLAP development headers installed
-
-### Build Steps
-
-```bash
-# Create build directory and configure
-mkdir build && cd build
-cmake ..
-
-# Build the plugin
-make
-
-# The resulting .clap plugin file will be in the build directory
+```sh
+export CLAP_PATH="$HOME/clap"
+cmake -S . -B build
+cmake --build build
 ```
 
-## Testing
+Alternatively, provide `CLAP_INCLUDE_DIR` as the directory containing
+`clap/clap.h`:
 
-Unit tests are written with Check framework and can be built and run as:
-
-```bash
-cd build
-make
-cd test
-./plugin_tests
+```sh
+cmake -S . -B build -DCLAP_INCLUDE_DIR=/path/to/clap/include
+cmake --build build
 ```
 
-## Next Steps
+The resulting `shipment_evaluator.clap` plugin is written to `build/`.
 
-1. Implement more complex DSP processing logic
-2. Add additional parameters to the plugin  
-3. Integrate with CLAP host extensions
-4. Add more comprehensive unit tests
-5. Implement plugin state saving/loading (if needed)
-6. Add GUI support through CLAP's GUI extension
+## Install
 
-## Design Philosophy
-
-This implementation demonstrates:
-- **Functional-first approach** for DSP logic where possible
-- **Test-driven development** with pure functions that are easy to test
-- **Clean separation** between C ABI interface and C++ internals 
-- **C++ benefits** like RAII, const correctness, and higher-order functions without breaking compatibility
+Copy `build/shipment_evaluator.clap` to
+`~/Library/Audio/Plug-Ins/CLAP/`, then rescan plugins in your DAW.

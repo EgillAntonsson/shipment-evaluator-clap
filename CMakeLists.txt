@@ -1,33 +1,45 @@
 cmake_minimum_required(VERSION 3.16)
-project(MyClapPlugin)
+project(shipment_evaluator_clap LANGUAGES CXX)
 
 set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 
-# Find CLAP
-find_package(PkgConfig REQUIRED)
-pkg_check_modules(CLAP REQUIRED clap)
+if(NOT APPLE)
+    message(FATAL_ERROR "The embedded Cocoa GUI currently requires macOS.")
+endif()
 
-# Create the plugin library
-add_library(my_clap_plugin SHARED
+enable_language(OBJCXX)
+set(CMAKE_OBJCXX_STANDARD 17)
+set(CMAKE_OBJCXX_STANDARD_REQUIRED ON)
+
+find_path(CLAP_INCLUDE_DIR clap/clap.h
+    HINTS "$ENV{CLAP_PATH}"
+    PATH_SUFFIXES include
+)
+
+if(NOT CLAP_INCLUDE_DIR)
+    message(FATAL_ERROR
+        "CLAP headers not found. Set CLAP_PATH to the CLAP checkout or "
+        "CLAP_INCLUDE_DIR to the directory containing clap/clap.h."
+    )
+endif()
+
+add_library(shipment_evaluator SHARED
     src/plugin.cpp
-    src/MyPlugin.cpp
-    src/DSPProcessor.cpp
+    src/ShipmentEvaluatorPlugin.cpp
+    src/ShipmentEvaluatorGui.mm
 )
 
-# Set include directories
-target_include_directories(my_clap_plugin PRIVATE
+target_include_directories(shipment_evaluator PRIVATE
     include
-    ${CLAP_INCLUDE_DIRS}
+    "${CLAP_INCLUDE_DIR}"
 )
 
-# Link libraries
-target_link_libraries(my_clap_plugin 
-    ${CLAP_LIBRARIES}
-)
+set_source_files_properties(src/ShipmentEvaluatorGui.mm PROPERTIES COMPILE_FLAGS "-fobjc-arc")
+target_link_libraries(shipment_evaluator PRIVATE "-framework AppKit")
 
-# Define plugin-specific variables
-set_target_properties(my_clap_plugin PROPERTIES
+set_target_properties(shipment_evaluator PROPERTIES
+    OUTPUT_NAME "shipment_evaluator"
     PREFIX ""
     SUFFIX ".clap"
 )

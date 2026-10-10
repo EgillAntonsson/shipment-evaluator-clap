@@ -1,8 +1,8 @@
-#include "MyPlugin.h"
+#include "ShipmentEvaluatorPlugin.h"
 #include <clap/clap.h>
 #include <cstring>
 
-const clap_plugin_descriptor_t *my_plugin_descriptor();
+const clap_plugin_descriptor_t *shipment_evaluator_descriptor();
 
 static bool CLAP_ABI clap_entry_init(const char *) {
     return true;
@@ -16,16 +16,16 @@ static uint32_t CLAP_ABI get_plugin_count(const clap_plugin_factory_t *) {
 
 static const clap_plugin_descriptor_t *CLAP_ABI get_plugin_descriptor(
     const clap_plugin_factory_t *, uint32_t index) {
-    return index == 0 ? my_plugin_descriptor() : nullptr;
+    return index == 0 ? shipment_evaluator_descriptor() : nullptr;
 }
 
 static const clap_plugin_t *CLAP_ABI create_plugin(
     const clap_plugin_factory_t *, const clap_host_t *host, const char *plugin_id) {
-    const clap_plugin_descriptor_t *descriptor = my_plugin_descriptor();
+    const clap_plugin_descriptor_t *descriptor = shipment_evaluator_descriptor();
     if (!plugin_id || std::strcmp(plugin_id, descriptor->id) != 0)
         return nullptr;
 
-    return (new MyPlugin(host))->get_clap_interface();
+    return (new ShipmentEvaluatorPlugin(host))->get_clap_interface();
 }
 
 static const clap_plugin_factory_t plugin_factory = {
