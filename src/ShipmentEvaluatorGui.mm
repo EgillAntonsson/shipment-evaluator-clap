@@ -2,11 +2,17 @@
 #include "ShipmentEvaluatorGui.h"
 #include <algorithm>
 #include <cmath>
+#import <os/log.h>
 
 namespace {
 constexpr CGFloat kWindowWidth = 640.0;
 constexpr CGFloat kWindowHeight = 500.0;
 constexpr CGFloat kPi = 3.14159265358979323846;
+
+os_log_t gui_log() {
+    static os_log_t logger = os_log_create("rocks.egill.shipment-evaluator", "gui");
+    return logger;
+}
 
 void draw_text(NSString *text,
                NSRect rect,
@@ -69,6 +75,7 @@ void draw_text(NSString *text,
                                                        selector:@selector(refreshMeter:)
                                                        userInfo:nil
                                                         repeats:YES];
+        os_log_info(gui_log(), "GUI refresh timer started");
     } else if (refresh_timer_) {
         [refresh_timer_ invalidate];
         refresh_timer_ = nil;
@@ -78,6 +85,12 @@ void draw_text(NSString *text,
 - (void)refreshMeter:(NSTimer *)timer {
     (void)timer;
     [self setNeedsDisplay:YES];
+    static NSUInteger refresh_count = 0;
+    if (++refresh_count % 30 == 0) {
+        os_log_info(gui_log(),
+                    "GUI refresh timer active: meter=%.3f",
+                    meter_->load(std::memory_order_relaxed));
+    }
 }
 
 - (void)drawRect:(NSRect)dirtyRect {
@@ -217,24 +230,47 @@ ShipmentEvaluatorGui::~ShipmentEvaluatorGui() {
     destroy();
 }
 
-bool ShipmentEvaluatorGui::create() {
-    if (view_)
+bool ShipmentEvaluatorGui::create(bool is_floating) {
+    if (view_ || window_)
         return true;
 
     ShipmentMeterView *view = [[ShipmentMeterView alloc] initWithMeter:meter_];
     if (!view)
         return false;
     view_ = (__bridge_retained void *)view;
+
+    if (is_floating) {
+        NSWindow *window = [[NSWindow alloc]
+            initWithContentRect:NSMakeRect(0.0, 0.0, kWindowWidth, kWindowHeight)
+                      styleMask:NSWindowStyleMaskTitled |
+                                NSWindowStyleMaskClosable |
+                                NSWindowStyleMaskMiniaturizable
+                        backing:NSBackingStoreBuffered
+                          defer:NO];
+        if (!window) {
+            destroy();
+            return false;
+        }
+        [window setContentView:view];
+        window_ = (__bridge_retained void *)window;
+    }
+
     return true;
 }
 
 void ShipmentEvaluatorGui::destroy() {
-    if (!view_)
-        return;
+    if (window_) {
+        NSWindow *window = (__bridge_transfer NSWindow *)window_;
+        window_ = nullptr;
+        [window setContentView:nil];
+        [window close];
+    }
 
-    ShipmentMeterView *view = (__bridge_transfer ShipmentMeterView *)view_;
-    view_ = nullptr;
-    [view removeFromSuperview];
+    if (view_) {
+        ShipmentMeterView *view = (__bridge_transfer ShipmentMeterView *)view_;
+        view_ = nullptr;
+        [view removeFromSuperview];
+    }
 }
 
 bool ShipmentEvaluatorGui::get_size(uint32_t *width, uint32_t *height) const {
@@ -257,7 +293,7 @@ bool ShipmentEvaluatorGui::set_size(uint32_t width, uint32_t height) {
 }
 
 bool ShipmentEvaluatorGui::set_parent(void *parent_view) {
-    if (!view_ || !parent_view)
+    if (!view_ || window_ || !parent_view)
         return false;
 
     ShipmentMeterView *view = (__bridge ShipmentMeterView *)view_;
@@ -269,9 +305,37 @@ bool ShipmentEvaluatorGui::set_parent(void *parent_view) {
     return true;
 }
 
+bool ShipmentEvaluatorGui::set_transient(void *parent_view) {
+    if (!window_ || !parent_view)
+        return false;
+
+    NSView *parent = (__bridge NSView *)parent_view;
+    NSWindow *parent_window = parent.window;
+    if (!parent_window)
+        return false;
+
+    NSWindow *window = (__bridge NSWindow *)window_;
+    [window setParentWindow:parent_window];
+    return true;
+}
+
+void ShipmentEvaluatorGui::suggest_title(const char *title) {
+    if (!window_ || !title)
+        return;
+
+    NSString *window_title = [NSString stringWithUTF8String:title];
+    if (window_title)
+        [(__bridge NSWindow *)window_ setTitle:window_title];
+}
+
 bool ShipmentEvaluatorGui::show() {
     if (!view_)
         return false;
+
+    if (window_) {
+        [(__bridge NSWindow *)window_ makeKeyAndOrderFront:nil];
+        return true;
+    }
 
     ShipmentMeterView *view = (__bridge ShipmentMeterView *)view_;
     view.hidden = NO;
@@ -281,6 +345,11 @@ bool ShipmentEvaluatorGui::show() {
 bool ShipmentEvaluatorGui::hide() {
     if (!view_)
         return false;
+
+    if (window_) {
+        [(__bridge NSWindow *)window_ orderOut:nil];
+        return true;
+    }
 
     ShipmentMeterView *view = (__bridge ShipmentMeterView *)view_;
     view.hidden = YES;

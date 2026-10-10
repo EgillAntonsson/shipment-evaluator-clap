@@ -24,7 +24,7 @@ if(NOT CLAP_INCLUDE_DIR)
     )
 endif()
 
-add_library(shipment_evaluator SHARED
+add_library(shipment_evaluator MODULE
     src/plugin.cpp
     src/ShipmentEvaluatorPlugin.cpp
     src/ShipmentEvaluatorGui.mm
@@ -41,5 +41,13 @@ target_link_libraries(shipment_evaluator PRIVATE "-framework AppKit")
 set_target_properties(shipment_evaluator PROPERTIES
     OUTPUT_NAME "shipment_evaluator"
     PREFIX ""
-    SUFFIX ".clap"
+    BUNDLE TRUE
+    BUNDLE_EXTENSION "clap"
+    MACOSX_BUNDLE_GUI_IDENTIFIER "rocks.egill.shipment-evaluator"
+    MACOSX_BUNDLE_INFO_PLIST "${CMAKE_CURRENT_SOURCE_DIR}/cmake/ClapInfo.plist.in"
+)
+
+add_custom_command(TARGET shipment_evaluator POST_BUILD
+    COMMAND codesign --force --deep --sign - "$<TARGET_BUNDLE_DIR:shipment_evaluator>"
+    VERBATIM
 )
