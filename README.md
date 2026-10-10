@@ -1,16 +1,18 @@
 # The Shipment Evaluator CLAP Plugin
 
-A CLAP utility plugin inspired by the [ReaScript Shipment Evaluator](https://www.egill.rocks/blog/rea-scripts/shipment-evaluator).
-It does not have audio inputs or outputs and does not process audio.
+See the demonstration video and more info on [The Shipment Evaluator](https://www.egill.rocks/blog/clap/shipment-evaluator).
 
-When the host transport is playing, the Evaluation Meter advances by 0.025 per
-processing block until it reaches 11. Stopping playback resets the meter. At 11,
-the GUI displays:
+## Disclaimer
 
-> ♬ ♫ ♪ ♩  →  SHIP IT !  ←  ♩ ♪ ♫ ♬
+Use this plugin at your own risk: it goes to 11 and provides a powerful urge to
+`♬ ♫ ♪ ♩ →  SHIP IT  ← ♩ ♪ ♫ ♬`. Be careful when you use it—not too soon, not
+too late.
 
-The plugin provides an embedded Cocoa GUI on macOS. The needle follows the
-transport-driven meter; it is a display, not an audio control.
+The plugin always gives the same evaluation. It is a visual encouragement and
+does not process or analyze audio.
+
+While the DAW is playing, the Evaluation Meter advances toward 11. At 11, the
+plugin displays the “SHIP IT!” result. Stopping playback resets the meter.
 
 ## Build
 
@@ -42,5 +44,9 @@ The resulting `shipment_evaluator.clap` plugin is written to `build/`.
 
 ## Install
 
-Copy `build/shipment_evaluator.clap` to
-`~/Library/Audio/Plug-Ins/CLAP/`, then rescan plugins in your DAW.
+On macOS, copy `build/shipment_evaluator.clap` to
+`~/Library/Audio/Plug-Ins/CLAP/`, then rescan plugins in your DAW. Alternatively,
+copy it to another directory your DAW scans for CLAP plugins.
+
+Add the plugin to a track, press play, and get the urge to
+`♬ ♫ ♪ ♩ →  SHIP IT  ← ♩ ♪ ♫ ♬`.
