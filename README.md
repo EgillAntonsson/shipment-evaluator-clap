@@ -5,15 +5,18 @@ See the demonstration video and more info on [The Shipment Evaluator](https://ww
 ## Disclaimer
 
 Use this plugin at your own risk: it goes to 11 and provides a powerful urge to
-`♬ ♫ ♪ ♩ →  SHIP IT  ← ♩ ♪ ♫ ♬`. Be careful when you use it—not too soon, not
+`♬ ♫ ♪ ♩ →  SHIP IT  ← ♩ ♪ ♫ ♬`. Be careful when you use it — not too soon, not
 too late.
 
 The plugin always gives the same evaluation. It is a visual encouragement and
 does not alter or analyze audio; its stereo audio ports pass the input through
 unchanged so the plugin can sit in a DAW track's FX chain.
 
+## The behavior
+
 While the DAW is playing, the Evaluation Meter advances toward 11. At 11, the
-plugin displays the “SHIP IT!” result. Stopping playback resets the meter.
+plugin displays the `♬ ♫ ♪ ♩ →  SHIP IT  ← ♩ ♪ ♫ ♬` result. Stopping playback
+resets the meter.
 
 ## Build
 
@@ -57,15 +60,12 @@ step, run (the destination can be overridden with `CLAP_PLUGIN_DIR`):
 ./scripts/install-macos.sh
 ```
 
-## Known issues and REAPER troubleshooting
+## Development Cycle
 
-The plugin does not change or analyze audio. When REAPER is playing, its meter
-should advance toward 11; stopping playback resets it.
-
-If REAPER marks the plugin unavailable after an install or update, the
-`scripts/restart-reaper-rescan.sh` helper gracefully quits REAPER, backs up the
-CLAP cache, removes only the Shipment Evaluator cache entry, and restarts REAPER
-so it can rescan this plugin. Save any open project when prompted.
+Use the `REAPER` DAW for development and verification. Run
+`scripts/restart-reaper-rescan.sh` to restart REAPER, back up the CLAP cache,
+remove only the Shipment Evaluator cache entry, and restart REAPER so it can
+rescan this plugin. Save any open project when prompted.
 
 After REAPER restarts and completes its scan, run the replacement ReaScript once
 to remove any stale Shipment Evaluator instance from the Master track, add a
@@ -79,12 +79,11 @@ fresh instance, and open its window:
 The FX replacement is recorded as one undoable project change. The helper only
 changes the Master track; it does not remove instances from other tracks.
 
-The initial REAPER compatibility issue was caused by a missing required
+## Known issues
+
+The initial DAW / REAPER compatibility issue was caused by a missing required
 `on_main_thread` callback. The plugin now supplies that callback and is built as
-a signed macOS `.clap` bundle. If the meter remains static after a fresh
-instance is added, verify that the track or Master FX chain is processing during
-playback; the plugin's diagnostic logs include transport flags, meter progress,
-and GUI refresh activity.
+a signed macOS `.clap` bundle.
 
 Add the plugin to a track, press play, and get the urge to
 `♬ ♫ ♪ ♩ →  SHIP IT  ← ♩ ♪ ♫ ♬`.
