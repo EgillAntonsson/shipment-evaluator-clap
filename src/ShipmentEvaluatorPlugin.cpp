@@ -301,16 +301,12 @@ clap_process_status CLAP_ABI ShipmentEvaluatorPlugin::process(
         const double meter = instance->evaluation_meter_.load(std::memory_order_relaxed);
         const double updated_meter = advance_evaluation_meter(meter, true);
         instance->evaluation_meter_.store(updated_meter, std::memory_order_relaxed);
-        if (updated_meter > meter) {
-            if (evaluation_is_complete(updated_meter))
-                request_gui_refresh = true;
-            instance->gui_callback_frame_accumulator_ += process->frames_count;
-            if (instance->gui_callback_frame_accumulator_ >=
-                instance->gui_callback_frame_threshold_) {
-                instance->gui_callback_frame_accumulator_ %=
-                    instance->gui_callback_frame_threshold_;
-                request_gui_refresh = true;
-            }
+        instance->gui_callback_frame_accumulator_ += process->frames_count;
+        if (instance->gui_callback_frame_accumulator_ >=
+            instance->gui_callback_frame_threshold_) {
+            instance->gui_callback_frame_accumulator_ %=
+                instance->gui_callback_frame_threshold_;
+            request_gui_refresh = true;
         }
 
         const uint64_t previous_frames =

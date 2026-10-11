@@ -18,11 +18,18 @@ struct RGBAColor {
 constexpr RGBAColor kBackgroundColor{0.035, 0.045, 0.045, 1.0};
 constexpr RGBAColor kPanelColor{0.075, 0.09, 0.085, 1.0};
 constexpr RGBAColor kMutedColor{0.62, 0.67, 0.61, 1.0};
-constexpr RGBAColor kAccentColor{0.73, 0.83, 0.29, 1.0};
 constexpr RGBAColor kTextColor{0.94, 0.94, 0.94, 1.0};
 constexpr RGBAColor kKnobTopColor{0.42, 0.44, 0.41, 1.0};
 constexpr RGBAColor kKnobBottomColor{0.13, 0.15, 0.14, 1.0};
 constexpr RGBAColor kKnobIndicatorColor{0.95, 0.95, 0.87, 1.0};
+constexpr RGBAColor kShipItColors[] = {
+    {1.0, 0.48, 0.53, 1.0},
+    {1.0, 0.69, 0.4, 1.0},
+    {1.0, 0.91, 0.45, 1.0},
+    {0.48, 0.96, 0.63, 1.0},
+    {0.45, 0.78, 1.0, 1.0},
+    {0.78, 0.62, 1.0, 1.0}
+};
 
 NSColor *make_color(const RGBAColor &color) {
     return [NSColor colorWithCalibratedRed:color.red
@@ -46,7 +53,7 @@ void draw_text(NSString *text,
 }
 
 void draw_amplifier_knob(NSPoint center, double angle) {
-    constexpr CGFloat kFaceRadius = 49.0;
+    constexpr CGFloat kFaceRadius = 84.0;
     NSRect face_rect = NSMakeRect(center.x - kFaceRadius,
                                   center.y - kFaceRadius,
                                   kFaceRadius * 2.0,
@@ -61,11 +68,11 @@ void draw_amplifier_knob(NSPoint center, double angle) {
     [face stroke];
 
     NSBezierPath *indicator = [NSBezierPath bezierPath];
-    [indicator moveToPoint:NSMakePoint(center.x + std::cos(angle) * 10.0,
-                                       center.y + std::sin(angle) * 10.0)];
-    [indicator lineToPoint:NSMakePoint(center.x + std::cos(angle) * 40.0,
-                                       center.y + std::sin(angle) * 40.0)];
-    indicator.lineWidth = 5.0;
+    [indicator moveToPoint:NSMakePoint(center.x + std::cos(angle) * 16.0,
+                                       center.y + std::sin(angle) * 16.0)];
+    [indicator lineToPoint:NSMakePoint(center.x + std::cos(angle) * 70.0,
+                                       center.y + std::sin(angle) * 70.0)];
+    indicator.lineWidth = 7.0;
     indicator.lineCapStyle = NSLineCapStyleRound;
     [make_color(kKnobIndicatorColor) setStroke];
     [indicator stroke];
@@ -106,7 +113,6 @@ void draw_amplifier_knob(NSPoint center, double angle) {
     NSColor *const background = make_color(kBackgroundColor);
     NSColor *const panel = make_color(kPanelColor);
     NSColor *const muted = make_color(kMutedColor);
-    NSColor *const accent = make_color(kAccentColor);
     NSColor *const text = make_color(kTextColor);
 
     [background setFill];
@@ -121,24 +127,16 @@ void draw_amplifier_knob(NSPoint center, double angle) {
               [NSFont boldSystemFontOfSize:19.0],
               text,
               NSTextAlignmentCenter);
-    draw_text(@"A highly scientific, completely predictable assessment",
+    draw_text(@"A highly scientific, completely predictable and deterministic evaluation",
               NSMakeRect(30.0, 421.0, bounds.size.width - 60.0, 20.0),
               [NSFont systemFontOfSize:12.0],
               muted,
               NSTextAlignmentCenter);
 
     const double meter = clamp_evaluation_meter(meter_->load(std::memory_order_relaxed));
-    const NSPoint center = NSMakePoint(bounds.size.width * 0.5, 273.0);
+    const NSPoint center = NSMakePoint(bounds.size.width * 0.5,
+                                       bounds.size.height * 0.5);
     const CGFloat arcRadius = 124.0;
-    NSBezierPath *arc = [NSBezierPath bezierPath];
-    [arc appendBezierPathWithArcWithCenter:center
-                                    radius:arcRadius
-                                startAngle:180.0
-                                  endAngle:0.0
-                                 clockwise:NO];
-    arc.lineWidth = 5.0;
-    [muted setStroke];
-    [arc stroke];
 
     for (int tick = 0; tick <= 11; ++tick) {
         const double angle = evaluation_meter_angle(static_cast<double>(tick));
@@ -151,42 +149,40 @@ void draw_amplifier_knob(NSPoint center, double angle) {
         NSBezierPath *mark = [NSBezierPath bezierPath];
         [mark moveToPoint:start];
         [mark lineToPoint:end];
-        mark.lineWidth = tick % 2 == 0 ? 2.0 : 1.0;
-        NSColor *tickColor = static_cast<double>(tick) <= meter ? accent : muted;
+        mark.lineWidth = tick % 2 == 0 ? 1.0 : 2.0;
+        NSColor *const tickColor = static_cast<double>(tick) <= meter ? text : muted;
         [tickColor setStroke];
         [mark stroke];
 
-        const CGFloat labelRadius = arcRadius + 12.0;
+        const CGFloat labelRadius = arcRadius + 20.0;
         const NSPoint labelPoint = NSMakePoint(center.x + std::cos(angle) * labelRadius - 12.0,
                                                center.y + std::sin(angle) * labelRadius - 8.0);
         draw_text([NSString stringWithFormat:@"%d", tick],
                   NSMakeRect(labelPoint.x, labelPoint.y, 24.0, 16.0),
                   [NSFont monospacedDigitSystemFontOfSize:11.0 weight:NSFontWeightMedium],
-                  muted,
+                  tickColor,
                   NSTextAlignmentCenter);
     }
 
     draw_amplifier_knob(center, evaluation_meter_angle(meter));
 
     draw_text([NSString stringWithFormat:@"%.1f", meter],
-              NSMakeRect(center.x - 44.0, center.y - 105.0, 88.0, 32.0),
+              NSMakeRect(center.x - 44.0, center.y - 127.0, 88.0, 32.0),
               [NSFont monospacedDigitSystemFontOfSize:23.0 weight:NSFontWeightSemibold],
               text,
               NSTextAlignmentCenter);
 
     if (evaluation_is_complete(meter)) {
+        const NSUInteger color_index =
+            static_cast<NSUInteger>(std::floor([NSDate timeIntervalSinceReferenceDate])) %
+            (sizeof(kShipItColors) / sizeof(kShipItColors[0]));
         draw_text(@"♬ ♫ ♪ ♩  →  SHIP IT !  ←  ♩ ♪ ♫ ♬",
                   NSMakeRect(28.0, 91.0, bounds.size.width - 56.0, 28.0),
                   [NSFont boldSystemFontOfSize:18.0],
-                  accent,
-                  NSTextAlignmentCenter);
-        draw_text(@"A fixed result. Audio passes through unchanged.",
-                  NSMakeRect(30.0, 66.0, bounds.size.width - 60.0, 17.0),
-                  [NSFont systemFontOfSize:10.0],
-                  muted,
+                  make_color(kShipItColors[color_index]),
                   NSTextAlignmentCenter);
     } else {
-        draw_text(@"Start playback to begin the evaluation",
+        draw_text(meter > 0.0 ? @"... Evaluating ..." : @"Start playback to begin the evaluation",
                   NSMakeRect(28.0, 91.0, bounds.size.width - 56.0, 24.0),
                   [NSFont systemFontOfSize:14.0],
                   muted,

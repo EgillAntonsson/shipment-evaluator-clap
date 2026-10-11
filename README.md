@@ -17,7 +17,8 @@ unchanged so the plugin can sit in a DAW track's FX chain.
 Add the plugin to a track and press play: the Evaluation Meter's amp-style knob
 rotates toward 11, then displays the `♬ ♫ ♪ ♩ →  SHIP IT  ← ♩ ♪ ♫ ♬` result.
 The result stays visible while playback continues at 11; stopping or pausing
-resets the meter, and playback starts a new evaluation from 0.
+resets the meter, and playback starts a new evaluation from 0. The result text
+cycles through seven rainbow colors, changing once per second.
 
 ## Build
 
