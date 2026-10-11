@@ -1,14 +1,7 @@
 #include "ShipmentEvaluatorPlugin.h"
 #include "EvaluationMeter.h"
 #include <algorithm>
-#include <cstdio>
 #include <cstring>
-#include <os/log.h>
-
-static os_log_t shipment_evaluator_log() {
-    static os_log_t logger = os_log_create("rocks.egill.shipment-evaluator", "clap");
-    return logger;
-}
 
 static const char *plugin_features[] = {
     CLAP_PLUGIN_FEATURE_AUDIO_EFFECT,
@@ -64,54 +57,22 @@ ShipmentEvaluatorPlugin *ShipmentEvaluatorPlugin::from_plugin(const clap_plugin_
     return plugin ? static_cast<ShipmentEvaluatorPlugin *>(plugin->plugin_data) : nullptr;
 }
 
-void ShipmentEvaluatorPlugin::log_host(clap_log_severity severity,
-                                       const char *message) const {
-    if (host_ && host_log_ && host_log_->log)
-        host_log_->log(host_, severity, message);
-}
-
 bool CLAP_ABI ShipmentEvaluatorPlugin::init(const clap_plugin_t *plugin) {
     ShipmentEvaluatorPlugin *instance = from_plugin(plugin);
     if (!instance)
         return false;
 
-    if (instance->host_ && instance->host_->get_extension) {
-        instance->host_log_ = static_cast<const clap_host_log_t *>(
-            instance->host_->get_extension(instance->host_, CLAP_EXT_LOG));
-    }
-    const clap_version_t host_version = instance->host_
-        ? instance->host_->clap_version
-        : clap_version_t{};
-    os_log_info(shipment_evaluator_log(),
-                "CLAP init succeeded: host=%{public}s host_version=%u.%u.%u "
-                "plugin_version=%u.%u.%u",
-                instance->host_ && instance->host_->name
-                    ? instance->host_->name
-                    : "(unknown)",
-                host_version.major,
-                host_version.minor,
-                host_version.revision,
-                kShipmentEvaluatorClapVersion.major,
-                kShipmentEvaluatorClapVersion.minor,
-                kShipmentEvaluatorClapVersion.revision);
-    instance->log_host(CLAP_LOG_INFO, "Shipment Evaluator: init succeeded");
     return true;
 }
 
 void CLAP_ABI ShipmentEvaluatorPlugin::destroy(const clap_plugin_t *plugin) {
-    os_log_info(shipment_evaluator_log(), "CLAP plugin destroy");
     delete from_plugin(plugin);
 }
 
 bool CLAP_ABI ShipmentEvaluatorPlugin::activate(const clap_plugin_t *plugin,
                                                 double sample_rate,
-                                                uint32_t min_frames,
-                                                uint32_t max_frames) {
-    os_log_info(shipment_evaluator_log(),
-                "CLAP activate entered: sample_rate=%f min_frames=%u max_frames=%u",
-                sample_rate,
-                min_frames,
-                max_frames);
+                                                uint32_t,
+                                                uint32_t) {
     ShipmentEvaluatorPlugin *instance = from_plugin(plugin);
     if (!instance)
         return false;
@@ -122,44 +83,25 @@ bool CLAP_ABI ShipmentEvaluatorPlugin::activate(const clap_plugin_t *plugin,
     instance->gui_callback_frame_threshold_ =
         std::max(1u, static_cast<uint32_t>(sample_rate / 30.0));
     instance->gui_callback_frame_accumulator_ = 0;
-    char message[128];
-    std::snprintf(message, sizeof(message),
-                  "Shipment Evaluator: activate succeeded at %.0f Hz", sample_rate);
-    os_log_info(shipment_evaluator_log(), "CLAP activate succeeded at %f Hz", sample_rate);
-    instance->log_host(CLAP_LOG_INFO, message);
     return true;
 }
 
 void CLAP_ABI ShipmentEvaluatorPlugin::deactivate(const clap_plugin_t *plugin) {
-    if (ShipmentEvaluatorPlugin *instance = from_plugin(plugin))
-        instance->log_host(CLAP_LOG_INFO, "Shipment Evaluator: deactivated");
     reset(plugin);
 }
 
 bool CLAP_ABI ShipmentEvaluatorPlugin::start_processing(const clap_plugin_t *plugin) {
-    if (ShipmentEvaluatorPlugin *instance = from_plugin(plugin)) {
-        os_log_info(shipment_evaluator_log(), "CLAP start_processing called");
-        instance->log_host(CLAP_LOG_INFO, "Shipment Evaluator: start_processing succeeded");
-    }
+    (void)plugin;
     return true;
 }
 
 void CLAP_ABI ShipmentEvaluatorPlugin::stop_processing(const clap_plugin_t *plugin) {
-    if (ShipmentEvaluatorPlugin *instance = from_plugin(plugin))
-        instance->log_host(CLAP_LOG_INFO, "Shipment Evaluator: stop_processing");
+    (void)plugin;
 }
 
 void CLAP_ABI ShipmentEvaluatorPlugin::on_main_thread(const clap_plugin_t *plugin) {
     if (ShipmentEvaluatorPlugin *instance = from_plugin(plugin)) {
         instance->gui_.refresh();
-        const uint32_t callback_count =
-            instance->gui_callback_count_.fetch_add(1, std::memory_order_relaxed);
-        if (callback_count % 30 == 0) {
-            os_log_info(shipment_evaluator_log(),
-                        "CLAP GUI refresh callback: count=%u meter=%.3f",
-                        callback_count + 1,
-                        instance->evaluation_meter_.load(std::memory_order_relaxed));
-        }
     }
 }
 
@@ -179,44 +121,6 @@ clap_process_status CLAP_ABI ShipmentEvaluatorPlugin::process(
     ShipmentEvaluatorPlugin *instance = from_plugin(plugin);
     if (!instance || !process)
         return CLAP_PROCESS_ERROR;
-
-    if (!instance->process_diagnostic_logged_.exchange(true, std::memory_order_relaxed)) {
-        const clap_audio_buffer_t *input =
-            process->audio_inputs_count && process->audio_inputs
-                ? &process->audio_inputs[0]
-                : nullptr;
-        const clap_audio_buffer_t *output =
-            process->audio_outputs_count && process->audio_outputs
-                ? &process->audio_outputs[0]
-                : nullptr;
-        char message[256];
-        std::snprintf(message,
-                      sizeof(message),
-                      "Shipment Evaluator process: frames=%u inputs=%u (ch=%u, f32=%d, f64=%d) "
-                      "outputs=%u (ch=%u, f32=%d, f64=%d)",
-                      process->frames_count,
-                      process->audio_inputs_count,
-                      input ? input->channel_count : 0,
-                      input && input->data32,
-                      input && input->data64,
-                      process->audio_outputs_count,
-                      output ? output->channel_count : 0,
-                      output && output->data32,
-                      output && output->data64);
-        os_log_info(shipment_evaluator_log(),
-                    "CLAP process: frames=%u inputs=%u in_channels=%u in_f32=%d in_f64=%d "
-                    "outputs=%u out_channels=%u out_f32=%d out_f64=%d",
-                    process->frames_count,
-                    process->audio_inputs_count,
-                    input ? input->channel_count : 0,
-                    input && input->data32,
-                    input && input->data64,
-                    process->audio_outputs_count,
-                    output ? output->channel_count : 0,
-                    output && output->data32,
-                    output && output->data64);
-        instance->log_host(CLAP_LOG_INFO, message);
-    }
 
     if (process->frames_count > 0 && process->audio_outputs &&
         process->audio_outputs_count > 0) {
@@ -289,13 +193,6 @@ clap_process_status CLAP_ABI ShipmentEvaluatorPlugin::process(
     const uint32_t previous_flags =
         instance->last_transport_flags_.exchange(transport_flags, std::memory_order_relaxed);
     bool request_gui_refresh = previous_flags != transport_flags;
-    if (previous_flags != transport_flags) {
-        os_log_info(shipment_evaluator_log(),
-                    "CLAP transport changed: present=%d flags=0x%x playing=%d",
-                    process->transport != nullptr,
-                    transport_flags,
-                    playing);
-    }
 
     if (playing) {
         const double meter = instance->evaluation_meter_.load(std::memory_order_relaxed);
@@ -309,21 +206,9 @@ clap_process_status CLAP_ABI ShipmentEvaluatorPlugin::process(
             request_gui_refresh = true;
         }
 
-        const uint64_t previous_frames =
-            instance->playing_diagnostic_frames_.fetch_add(process->frames_count,
-                                                            std::memory_order_relaxed);
-        if (previous_frames >= 48000) {
-            instance->playing_diagnostic_frames_.fetch_sub(48000,
-                                                           std::memory_order_relaxed);
-            os_log_info(shipment_evaluator_log(),
-                        "CLAP meter advancing: meter=%.3f transport_flags=0x%x",
-                        updated_meter,
-                        transport_flags);
-        }
     } else {
         instance->evaluation_meter_.store(advance_evaluation_meter(0.0, false),
                                           std::memory_order_relaxed);
-        instance->playing_diagnostic_frames_.store(0, std::memory_order_relaxed);
         instance->gui_callback_frame_accumulator_ = 0;
     }
 
@@ -335,10 +220,6 @@ clap_process_status CLAP_ABI ShipmentEvaluatorPlugin::process(
 
 const void *CLAP_ABI ShipmentEvaluatorPlugin::get_extension(const clap_plugin_t *,
                                                             const char *id) {
-    os_log_info(shipment_evaluator_log(),
-                "CLAP get_extension: %{public}s",
-                id ? id : "(null)");
-
     static const clap_plugin_gui_t gui_extension = {
         .is_api_supported = gui_is_api_supported,
         .get_preferred_api = gui_get_preferred_api,
@@ -385,9 +266,7 @@ const void *CLAP_ABI ShipmentEvaluatorPlugin::get_extension(const clap_plugin_t 
 
 uint32_t CLAP_ABI ShipmentEvaluatorPlugin::audio_port_count(const clap_plugin_t *,
                                                             bool is_input) {
-    os_log_info(shipment_evaluator_log(),
-                "CLAP audio_port_count: is_input=%d count=1",
-                is_input);
+    (void)is_input;
     return 1;
 }
 
@@ -395,10 +274,6 @@ bool CLAP_ABI ShipmentEvaluatorPlugin::audio_port_get(const clap_plugin_t *,
                                                       uint32_t index,
                                                       bool is_input,
                                                       clap_audio_port_info_t *info) {
-    os_log_info(shipment_evaluator_log(),
-                "CLAP audio_port_get: index=%u is_input=%d",
-                index,
-                is_input);
     if (index != 0 || !info)
         return false;
 
@@ -415,15 +290,11 @@ bool CLAP_ABI ShipmentEvaluatorPlugin::audio_port_get(const clap_plugin_t *,
 }
 
 uint32_t CLAP_ABI ShipmentEvaluatorPlugin::audio_ports_config_count(const clap_plugin_t *) {
-    os_log_info(shipment_evaluator_log(), "CLAP audio_ports_config_count: 1");
     return 1;
 }
 
 bool CLAP_ABI ShipmentEvaluatorPlugin::audio_ports_config_get(
     const clap_plugin_t *, uint32_t index, clap_audio_ports_config_t *config) {
-    os_log_info(shipment_evaluator_log(),
-                "CLAP audio_ports_config_get: index=%u",
-                index);
     if (index != 0 || !config)
         return false;
 
@@ -443,9 +314,6 @@ bool CLAP_ABI ShipmentEvaluatorPlugin::audio_ports_config_get(
 
 bool CLAP_ABI ShipmentEvaluatorPlugin::audio_ports_config_select(
     const clap_plugin_t *, clap_id config_id) {
-    os_log_info(shipment_evaluator_log(),
-                "CLAP audio_ports_config_select: id=%u",
-                config_id);
     return config_id == 0;
 }
 
@@ -465,10 +333,7 @@ bool CLAP_ABI ShipmentEvaluatorPlugin::audio_ports_config_info_get(
 bool CLAP_ABI ShipmentEvaluatorPlugin::gui_is_api_supported(const clap_plugin_t *,
                                                              const char *api,
                                                              bool is_floating) {
-    os_log_info(shipment_evaluator_log(),
-                "CLAP GUI is_api_supported: api=%{public}s floating=%d",
-                api ? api : "(null)",
-                is_floating);
+    (void)is_floating;
     return api && std::strcmp(api, CLAP_WINDOW_API_COCOA) == 0;
 }
 
@@ -480,18 +345,12 @@ bool CLAP_ABI ShipmentEvaluatorPlugin::gui_get_preferred_api(const clap_plugin_t
 
     *api = CLAP_WINDOW_API_COCOA;
     *is_floating = false;
-    os_log_info(shipment_evaluator_log(),
-                "CLAP GUI preferred API: Cocoa embedded");
     return true;
 }
 
 bool CLAP_ABI ShipmentEvaluatorPlugin::gui_create(const clap_plugin_t *plugin,
                                                   const char *api,
                                                   bool is_floating) {
-    os_log_info(shipment_evaluator_log(),
-                "CLAP GUI create: api=%{public}s floating=%d",
-                api ? api : "(null)",
-                is_floating);
     if (!gui_is_api_supported(plugin, api, is_floating))
         return false;
 
@@ -539,9 +398,6 @@ bool CLAP_ABI ShipmentEvaluatorPlugin::gui_set_size(const clap_plugin_t *plugin,
 
 bool CLAP_ABI ShipmentEvaluatorPlugin::gui_set_parent(const clap_plugin_t *plugin,
                                                       const clap_window_t *window) {
-    os_log_info(shipment_evaluator_log(),
-                "CLAP GUI set_parent: api=%{public}s",
-                window && window->api ? window->api : "(null)");
     ShipmentEvaluatorPlugin *instance = from_plugin(plugin);
     if (!instance || !window || !window->api ||
         std::strcmp(window->api, CLAP_WINDOW_API_COCOA) != 0)
@@ -552,9 +408,6 @@ bool CLAP_ABI ShipmentEvaluatorPlugin::gui_set_parent(const clap_plugin_t *plugi
 
 bool CLAP_ABI ShipmentEvaluatorPlugin::gui_set_transient(const clap_plugin_t *plugin,
                                                           const clap_window_t *window) {
-    os_log_info(shipment_evaluator_log(),
-                "CLAP GUI set_transient: api=%{public}s",
-                window && window->api ? window->api : "(null)");
     if (!window || !window->api ||
         std::strcmp(window->api, CLAP_WINDOW_API_COCOA) != 0)
         return false;
@@ -565,21 +418,16 @@ bool CLAP_ABI ShipmentEvaluatorPlugin::gui_set_transient(const clap_plugin_t *pl
 
 void CLAP_ABI ShipmentEvaluatorPlugin::gui_suggest_title(const clap_plugin_t *plugin,
                                                          const char *title) {
-    os_log_info(shipment_evaluator_log(),
-                "CLAP GUI suggest_title: %{public}s",
-                title ? title : "(null)");
     if (ShipmentEvaluatorPlugin *instance = from_plugin(plugin))
         instance->gui_.suggest_title(title);
 }
 
 bool CLAP_ABI ShipmentEvaluatorPlugin::gui_show(const clap_plugin_t *plugin) {
-    os_log_info(shipment_evaluator_log(), "CLAP GUI show");
     ShipmentEvaluatorPlugin *instance = from_plugin(plugin);
     return instance && instance->gui_.show();
 }
 
 bool CLAP_ABI ShipmentEvaluatorPlugin::gui_hide(const clap_plugin_t *plugin) {
-    os_log_info(shipment_evaluator_log(), "CLAP GUI hide");
     ShipmentEvaluatorPlugin *instance = from_plugin(plugin);
     return instance && instance->gui_.hide();
 }

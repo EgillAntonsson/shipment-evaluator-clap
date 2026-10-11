@@ -10,15 +10,11 @@ static os_log_t shipment_factory_log() {
 
 const clap_plugin_descriptor_t *shipment_evaluator_descriptor();
 
-static bool CLAP_ABI clap_entry_init(const char *plugin_path) {
-    os_log_info(shipment_factory_log(),
-                "CLAP entry init: path=%{public}s",
-                plugin_path ? plugin_path : "(null)");
+static bool CLAP_ABI clap_entry_init(const char *) {
     return true;
 }
 
 static void CLAP_ABI clap_entry_deinit() {
-    os_log_info(shipment_factory_log(), "CLAP entry deinit");
 }
 
 static uint32_t CLAP_ABI get_plugin_count(const clap_plugin_factory_t *) {
@@ -32,9 +28,6 @@ static const clap_plugin_descriptor_t *CLAP_ABI get_plugin_descriptor(
 
 static const clap_plugin_t *CLAP_ABI create_plugin(
     const clap_plugin_factory_t *, const clap_host_t *host, const char *plugin_id) {
-    os_log_info(shipment_factory_log(),
-                "CLAP create_plugin called with id=%{public}s",
-                plugin_id ? plugin_id : "(null)");
     const clap_plugin_descriptor_t *descriptor = shipment_evaluator_descriptor();
     if (!plugin_id || std::strcmp(plugin_id, descriptor->id) != 0) {
         os_log_error(shipment_factory_log(),
