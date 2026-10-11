@@ -14,9 +14,10 @@ unchanged so the plugin can sit in a DAW track's FX chain.
 
 ## The behavior
 
-Add the plugin to a track and press play: the Evaluation Meter advances toward
-11, then displays the `♬ ♫ ♪ ♩ →  SHIP IT  ← ♩ ♪ ♫ ♬` result. Stopping playback
-resets the meter. Enjoy the urge to ship it!
+Add the plugin to a track and press play: the Evaluation Meter's amp-style knob
+rotates toward 11, then displays the `♬ ♫ ♪ ♩ →  SHIP IT  ← ♩ ♪ ♫ ♬` result.
+The result stays visible while playback continues at 11; stopping or pausing
+resets the meter, and playback starts a new evaluation from 0.
 
 ## Build
 
@@ -79,6 +80,13 @@ fresh instance, and open its window:
 The FX replacement is recorded as one undoable project change. The helper only
 changes the Master track; it does not remove instances from other tracks.
 
+The pure meter and knob-angle logic has unit tests. Configure and build the
+project, then run:
+
+```sh
+ctest --test-dir build --output-on-failure
+```
+
 ## REAPER compatibility notes
 
 An earlier REAPER compatibility issue made the plugin appear unavailable: the
@@ -89,5 +97,5 @@ The embedded meter previously relied on a Cocoa run-loop timer to redraw. That
 timer did not reliably fire in REAPER's embedded UI, even though the audio
 processing callback reported playback and the meter value advanced. The plugin
 now requests periodic CLAP main-thread callbacks while playing and invalidates
-the view there. REAPER testing confirmed the needle advances to 11 and resets
-when playback stops.
+the view there. The meter shows the completed result only while playback
+continues; stopping or pausing resets it for the next evaluation.

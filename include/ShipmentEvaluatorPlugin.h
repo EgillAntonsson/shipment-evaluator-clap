@@ -78,7 +78,6 @@ private:
     static void gui_suggest_title(const clap_plugin_t *plugin, const char *title);
     static bool gui_show(const clap_plugin_t *plugin);
     static bool gui_hide(const clap_plugin_t *plugin);
-
     static ShipmentEvaluatorPlugin *from_plugin(const clap_plugin_t *plugin);
     void log_host(clap_log_severity severity, const char *message) const;
 };

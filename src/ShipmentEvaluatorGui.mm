@@ -1,12 +1,35 @@
 #import <AppKit/AppKit.h>
 #include "ShipmentEvaluatorGui.h"
+#include "EvaluationMeter.h"
 #include <algorithm>
 #include <cmath>
 
 namespace {
 constexpr CGFloat kWindowWidth = 640.0;
 constexpr CGFloat kWindowHeight = 500.0;
-constexpr CGFloat kPi = 3.14159265358979323846;
+
+struct RGBAColor {
+    CGFloat red;
+    CGFloat green;
+    CGFloat blue;
+    CGFloat alpha;
+};
+
+constexpr RGBAColor kBackgroundColor{0.035, 0.045, 0.045, 1.0};
+constexpr RGBAColor kPanelColor{0.075, 0.09, 0.085, 1.0};
+constexpr RGBAColor kMutedColor{0.62, 0.67, 0.61, 1.0};
+constexpr RGBAColor kAccentColor{0.73, 0.83, 0.29, 1.0};
+constexpr RGBAColor kTextColor{0.94, 0.94, 0.94, 1.0};
+constexpr RGBAColor kKnobTopColor{0.42, 0.44, 0.41, 1.0};
+constexpr RGBAColor kKnobBottomColor{0.13, 0.15, 0.14, 1.0};
+constexpr RGBAColor kKnobIndicatorColor{0.95, 0.95, 0.87, 1.0};
+
+NSColor *make_color(const RGBAColor &color) {
+    return [NSColor colorWithCalibratedRed:color.red
+                                    green:color.green
+                                     blue:color.blue
+                                    alpha:color.alpha];
+}
 
 void draw_text(NSString *text,
                NSRect rect,
@@ -21,6 +44,32 @@ void draw_text(NSString *text,
         NSParagraphStyleAttributeName: paragraph
     }];
 }
+
+void draw_amplifier_knob(NSPoint center, double angle) {
+    constexpr CGFloat kFaceRadius = 49.0;
+    NSRect face_rect = NSMakeRect(center.x - kFaceRadius,
+                                  center.y - kFaceRadius,
+                                  kFaceRadius * 2.0,
+                                  kFaceRadius * 2.0);
+    NSBezierPath *face = [NSBezierPath bezierPathWithOvalInRect:face_rect];
+    NSGradient *face_gradient = [[NSGradient alloc]
+        initWithStartingColor:make_color(kKnobTopColor)
+                  endingColor:make_color(kKnobBottomColor)];
+    [face_gradient drawInBezierPath:face angle:90.0];
+    [make_color(kMutedColor) setStroke];
+    face.lineWidth = 1.5;
+    [face stroke];
+
+    NSBezierPath *indicator = [NSBezierPath bezierPath];
+    [indicator moveToPoint:NSMakePoint(center.x + std::cos(angle) * 10.0,
+                                       center.y + std::sin(angle) * 10.0)];
+    [indicator lineToPoint:NSMakePoint(center.x + std::cos(angle) * 40.0,
+                                       center.y + std::sin(angle) * 40.0)];
+    indicator.lineWidth = 5.0;
+    indicator.lineCapStyle = NSLineCapStyleRound;
+    [make_color(kKnobIndicatorColor) setStroke];
+    [indicator stroke];
+}
 }
 
 @interface ShipmentMeterView : NSView {
@@ -28,6 +77,7 @@ void draw_text(NSString *text,
     const std::atomic<double> *meter_;
 }
 - (instancetype)initWithMeter:(const std::atomic<double> *)meter;
+- (void)refreshMeter;
 @end
 
 @implementation ShipmentMeterView
@@ -37,10 +87,7 @@ void draw_text(NSString *text,
     if (self) {
         meter_ = meter;
         self.wantsLayer = YES;
-        self.layer.backgroundColor = [NSColor colorWithCalibratedRed:0.035
-                                                               green:0.045
-                                                                blue:0.045
-                                                               alpha:1.0].CGColor;
+        self.layer.backgroundColor = make_color(kBackgroundColor).CGColor;
     }
     return self;
 }
@@ -49,25 +96,18 @@ void draw_text(NSString *text,
     return YES;
 }
 
+- (void)refreshMeter {
+    [self setNeedsDisplay:YES];
+}
+
 - (void)drawRect:(NSRect)dirtyRect {
     (void)dirtyRect;
     const NSRect bounds = self.bounds;
-    NSColor *const background = [NSColor colorWithCalibratedRed:0.035
-                                                          green:0.045
-                                                           blue:0.045
-                                                          alpha:1.0];
-    NSColor *const panel = [NSColor colorWithCalibratedRed:0.075
-                                                     green:0.09
-                                                      blue:0.085
-                                                     alpha:1.0];
-    NSColor *const muted = [NSColor colorWithCalibratedRed:0.62
-                                                     green:0.67
-                                                      blue:0.61
-                                                     alpha:1.0];
-    NSColor *const accent = [NSColor colorWithCalibratedRed:0.73
-                                                      green:0.83
-                                                       blue:0.29
-                                                      alpha:1.0];
+    NSColor *const background = make_color(kBackgroundColor);
+    NSColor *const panel = make_color(kPanelColor);
+    NSColor *const muted = make_color(kMutedColor);
+    NSColor *const accent = make_color(kAccentColor);
+    NSColor *const text = make_color(kTextColor);
 
     [background setFill];
     NSRectFill(bounds);
@@ -79,7 +119,7 @@ void draw_text(NSString *text,
     draw_text(@"THE SHIPMENT EVALUATOR",
               NSMakeRect(30.0, 446.0, bounds.size.width - 60.0, 26.0),
               [NSFont boldSystemFontOfSize:19.0],
-              [NSColor colorWithCalibratedWhite:0.94 alpha:1.0],
+              text,
               NSTextAlignmentCenter);
     draw_text(@"A highly scientific, completely predictable assessment",
               NSMakeRect(30.0, 421.0, bounds.size.width - 60.0, 20.0),
@@ -87,7 +127,7 @@ void draw_text(NSString *text,
               muted,
               NSTextAlignmentCenter);
 
-    const double meter = std::clamp(meter_->load(std::memory_order_relaxed), 0.0, 11.0);
+    const double meter = clamp_evaluation_meter(meter_->load(std::memory_order_relaxed));
     const NSPoint center = NSMakePoint(bounds.size.width * 0.5, 273.0);
     const CGFloat arcRadius = 124.0;
     NSBezierPath *arc = [NSBezierPath bezierPath];
@@ -101,7 +141,7 @@ void draw_text(NSString *text,
     [arc stroke];
 
     for (int tick = 0; tick <= 11; ++tick) {
-        const double angle = kPi * (1.0 - static_cast<double>(tick) / 11.0);
+        const double angle = evaluation_meter_angle(static_cast<double>(tick));
         const CGFloat outerRadius = arcRadius + 2.0;
         const CGFloat innerRadius = arcRadius - (tick % 2 == 0 ? 14.0 : 8.0);
         const NSPoint start = NSMakePoint(center.x + std::cos(angle) * outerRadius,
@@ -116,7 +156,7 @@ void draw_text(NSString *text,
         [tickColor setStroke];
         [mark stroke];
 
-        const CGFloat labelRadius = arcRadius + 28.0;
+        const CGFloat labelRadius = arcRadius + 12.0;
         const NSPoint labelPoint = NSMakePoint(center.x + std::cos(angle) * labelRadius - 12.0,
                                                center.y + std::sin(angle) * labelRadius - 8.0);
         draw_text([NSString stringWithFormat:@"%d", tick],
@@ -126,56 +166,32 @@ void draw_text(NSString *text,
                   NSTextAlignmentCenter);
     }
 
-    const double needleAngle = kPi * (1.0 - meter / 11.0);
-    const NSPoint needleTip = NSMakePoint(center.x + std::cos(needleAngle) * 105.0,
-                                          center.y + std::sin(needleAngle) * 105.0);
-    NSBezierPath *needle = [NSBezierPath bezierPath];
-    [needle moveToPoint:center];
-    [needle lineToPoint:needleTip];
-    needle.lineWidth = 4.0;
-    needle.lineCapStyle = NSLineCapStyleRound;
-    [accent setStroke];
-    [needle stroke];
+    draw_amplifier_knob(center, evaluation_meter_angle(meter));
 
-    NSBezierPath *hub = [NSBezierPath bezierPathWithOvalInRect:
-        NSMakeRect(center.x - 9.0, center.y - 9.0, 18.0, 18.0)];
-    [accent setFill];
-    [hub fill];
-
-    draw_text(@"THE EVALUATION METER",
-              NSMakeRect(40.0, 388.0, bounds.size.width - 80.0, 20.0),
-              [NSFont boldSystemFontOfSize:12.0],
-              accent,
-              NSTextAlignmentCenter);
     draw_text([NSString stringWithFormat:@"%.1f", meter],
-              NSMakeRect(center.x - 44.0, center.y - 55.0, 88.0, 32.0),
+              NSMakeRect(center.x - 44.0, center.y - 105.0, 88.0, 32.0),
               [NSFont monospacedDigitSystemFontOfSize:23.0 weight:NSFontWeightSemibold],
-              [NSColor colorWithCalibratedWhite:0.94 alpha:1.0],
+              text,
               NSTextAlignmentCenter);
 
-    draw_text(@"EVALUATION RESULT",
-              NSMakeRect(35.0, 101.0, bounds.size.width - 70.0, 19.0),
-              [NSFont boldSystemFontOfSize:11.0],
-              muted,
-              NSTextAlignmentCenter);
-    if (meter >= 11.0) {
+    if (evaluation_is_complete(meter)) {
         draw_text(@"♬ ♫ ♪ ♩  →  SHIP IT !  ←  ♩ ♪ ♫ ♬",
-                  NSMakeRect(28.0, 64.0, bounds.size.width - 56.0, 28.0),
+                  NSMakeRect(28.0, 91.0, bounds.size.width - 56.0, 28.0),
                   [NSFont boldSystemFontOfSize:18.0],
                   accent,
                   NSTextAlignmentCenter);
+        draw_text(@"A fixed result. Audio passes through unchanged.",
+                  NSMakeRect(30.0, 66.0, bounds.size.width - 60.0, 17.0),
+                  [NSFont systemFontOfSize:10.0],
+                  muted,
+                  NSTextAlignmentCenter);
     } else {
         draw_text(@"Start playback to begin the evaluation",
-                  NSMakeRect(28.0, 65.0, bounds.size.width - 56.0, 24.0),
+                  NSMakeRect(28.0, 91.0, bounds.size.width - 56.0, 24.0),
                   [NSFont systemFontOfSize:14.0],
                   muted,
                   NSTextAlignmentCenter);
     }
-    draw_text(@"A fixed result. No audio is processed.",
-              NSMakeRect(30.0, 32.0, bounds.size.width - 60.0, 17.0),
-              [NSFont systemFontOfSize:10.0],
-              muted,
-              NSTextAlignmentCenter);
 }
 @end
 
@@ -190,7 +206,8 @@ bool ShipmentEvaluatorGui::create(bool is_floating) {
     if (view_ || window_)
         return true;
 
-    ShipmentMeterView *view = [[ShipmentMeterView alloc] initWithMeter:meter_];
+    ShipmentMeterView *view =
+        [[ShipmentMeterView alloc] initWithMeter:meter_];
     if (!view)
         return false;
     view_ = (__bridge_retained void *)view;
@@ -288,7 +305,7 @@ void ShipmentEvaluatorGui::refresh() {
     if (!view_)
         return;
 
-    [(__bridge ShipmentMeterView *)view_ setNeedsDisplay:YES];
+    [(__bridge ShipmentMeterView *)view_ refreshMeter];
 }
 
 bool ShipmentEvaluatorGui::show() {

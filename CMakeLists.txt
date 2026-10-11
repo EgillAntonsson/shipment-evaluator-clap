@@ -1,6 +1,7 @@
 cmake_minimum_required(VERSION 3.16)
 project(shipment_evaluator_clap LANGUAGES CXX)
 
+set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 
@@ -51,3 +52,10 @@ add_custom_command(TARGET shipment_evaluator POST_BUILD
     COMMAND codesign --force --deep --sign - "$<TARGET_BUNDLE_DIR:shipment_evaluator>"
     VERBATIM
 )
+
+include(CTest)
+if(BUILD_TESTING)
+    add_executable(evaluation_meter_tests tests/EvaluationMeterTests.cpp)
+    target_include_directories(evaluation_meter_tests PRIVATE include)
+    add_test(NAME evaluation_meter_tests COMMAND evaluation_meter_tests)
+endif()

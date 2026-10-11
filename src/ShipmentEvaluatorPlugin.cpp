@@ -1,7 +1,8 @@
 #include "ShipmentEvaluatorPlugin.h"
+#include "EvaluationMeter.h"
 #include <algorithm>
-#include <cstring>
 #include <cstdio>
+#include <cstring>
 #include <os/log.h>
 
 static os_log_t shipment_evaluator_log() {
@@ -82,7 +83,11 @@ bool CLAP_ABI ShipmentEvaluatorPlugin::init(const clap_plugin_t *plugin) {
         ? instance->host_->clap_version
         : clap_version_t{};
     os_log_info(shipment_evaluator_log(),
-                "CLAP init succeeded: host_version=%u.%u.%u plugin_version=%u.%u.%u",
+                "CLAP init succeeded: host=%{public}s host_version=%u.%u.%u "
+                "plugin_version=%u.%u.%u",
+                instance->host_ && instance->host_->name
+                    ? instance->host_->name
+                    : "(unknown)",
                 host_version.major,
                 host_version.minor,
                 host_version.revision,
@@ -111,7 +116,9 @@ bool CLAP_ABI ShipmentEvaluatorPlugin::activate(const clap_plugin_t *plugin,
     if (!instance)
         return false;
 
-    instance->evaluation_meter_.store(0.0, std::memory_order_relaxed);
+    const double meter = instance->evaluation_meter_.load(std::memory_order_relaxed);
+    instance->evaluation_meter_.store(advance_evaluation_meter(meter, false),
+                                      std::memory_order_relaxed);
     instance->gui_callback_frame_threshold_ =
         std::max(1u, static_cast<uint32_t>(sample_rate / 30.0));
     instance->gui_callback_frame_accumulator_ = 0;
@@ -161,7 +168,9 @@ void CLAP_ABI ShipmentEvaluatorPlugin::reset(const clap_plugin_t *plugin) {
     if (!instance)
         return;
 
-    instance->evaluation_meter_.store(0.0, std::memory_order_relaxed);
+    const double meter = instance->evaluation_meter_.load(std::memory_order_relaxed);
+    instance->evaluation_meter_.store(advance_evaluation_meter(meter, false),
+                                      std::memory_order_relaxed);
 }
 
 clap_process_status CLAP_ABI ShipmentEvaluatorPlugin::process(
@@ -290,14 +299,18 @@ clap_process_status CLAP_ABI ShipmentEvaluatorPlugin::process(
 
     if (playing) {
         const double meter = instance->evaluation_meter_.load(std::memory_order_relaxed);
-        const double updated_meter = std::min(11.0, meter + 0.025);
+        const double updated_meter = advance_evaluation_meter(meter, true);
         instance->evaluation_meter_.store(updated_meter, std::memory_order_relaxed);
-        instance->gui_callback_frame_accumulator_ += process->frames_count;
-        if (instance->gui_callback_frame_accumulator_ >=
-            instance->gui_callback_frame_threshold_) {
-            instance->gui_callback_frame_accumulator_ %=
-                instance->gui_callback_frame_threshold_;
-            request_gui_refresh = true;
+        if (updated_meter > meter) {
+            if (evaluation_is_complete(updated_meter))
+                request_gui_refresh = true;
+            instance->gui_callback_frame_accumulator_ += process->frames_count;
+            if (instance->gui_callback_frame_accumulator_ >=
+                instance->gui_callback_frame_threshold_) {
+                instance->gui_callback_frame_accumulator_ %=
+                    instance->gui_callback_frame_threshold_;
+                request_gui_refresh = true;
+            }
         }
 
         const uint64_t previous_frames =
@@ -312,7 +325,8 @@ clap_process_status CLAP_ABI ShipmentEvaluatorPlugin::process(
                         transport_flags);
         }
     } else {
-        instance->evaluation_meter_.store(0.0, std::memory_order_relaxed);
+        instance->evaluation_meter_.store(advance_evaluation_meter(0.0, false),
+                                          std::memory_order_relaxed);
         instance->playing_diagnostic_frames_.store(0, std::memory_order_relaxed);
         instance->gui_callback_frame_accumulator_ = 0;
     }
